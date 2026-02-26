@@ -47,6 +47,17 @@ export default function TasksScreen({ user, onLogout }) {
     (t) => user && t.workflow_role_name === user.role
   );
 
+  const isUrgent = (task) => {
+      if (!task.order_delivery_date) return false;
+
+      const today = new Date();
+      const delivery = new Date(task.order_delivery_date);
+
+      const diffDays = (delivery - today) / (1000 * 60 * 60 * 24);
+
+      return diffDays <= 1;
+};
+
   return (
     <ScrollView style={styles.container}>
       {/* HEADER */}
@@ -86,10 +97,15 @@ export default function TasksScreen({ user, onLogout }) {
         const isMyRole =
           user && task.workflow_role_name === user.role;
 
+     {isUrgent(task) && (
+          <Text style={{ color: "red", fontWeight: "bold" }}>
+            🔥 Urgent
+          </Text>
+      )}
         return (
           <View
             key={task.id}
-            style={[styles.card, isMyRole && styles.myRoleCard]}
+            style={[styles.card, isUrgent(task) && styles.urgentCard,]}
           >
             <Text style={styles.title}>{task.workflow_step_name}</Text>
 
@@ -286,4 +302,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 5,
   },
+  urgentCard: {
+    borderLeftWidth: 5,
+    borderLeftColor: "#ef4444",
+  },
+
 });

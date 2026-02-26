@@ -7,6 +7,7 @@ from django.db import transaction
 from core.models import Task
 from core.serializers.task_serializer import TaskSerializer
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Case, When, IntegerField
 class TaskViewSet(ModelViewSet):
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
@@ -27,10 +28,16 @@ class TaskViewSet(ModelViewSet):
             qs = qs.filter(workflow_step__role__name=role)
 
         # hide pending tasks from worker view
-        qs = qs.exclude(status="pending")
+        qs = qs.annotate(
+            status_priority=Case(
+                When(status="ready", then=1),
+                When(status="in_progress", then=2),
+                default=3,
+                output_field=IntegerField(),
+            )
+        )
 
-        return qs.order_by("id")
-
+        return qs.order_by("order__delivery_date", "status_priority", "id")
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
