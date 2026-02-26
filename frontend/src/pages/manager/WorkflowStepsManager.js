@@ -15,7 +15,7 @@ function WorkflowStepsManager() {
     api
       .get(`manager/workflow-steps/?workflow=${workflowId}`)
       .then((res) => setSteps(res.data));
-  }, []);
+  }, [workflowId]);
 
   useEffect(() => {
     loadSteps();

@@ -18,7 +18,7 @@ function WorkerDashboard() {
 
   const loadTasks =  useCallback(async () => {
     fetchTasksByRole(myRole).then(setTasks);
-  }, []);
+  }, [myRole]);
 
   useEffect(() => {
     loadTasks();

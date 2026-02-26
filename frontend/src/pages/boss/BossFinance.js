@@ -20,7 +20,7 @@ export default function BossFinance() {
   const loadMonthlyReport = useCallback(async () => {
     api.get(`boss/monthly-report/?month=${currentMonth}`)
       .then(res => setReport(res.data));
-  }, []);
+  }, [currentMonth]);
 
   useEffect(() => {
     loadEntries();
