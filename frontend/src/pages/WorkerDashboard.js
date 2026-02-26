@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect,useCallback, useState } from "react";
 import {
   fetchTasksByRole,
   startTask,
@@ -16,13 +16,13 @@ function WorkerDashboard() {
     };
 
 
-  const loadTasks = () => {
+  const loadTasks =  useCallback(async () => {
     fetchTasksByRole(myRole).then(setTasks);
-  };
+  }, []);
 
   useEffect(() => {
     loadTasks();
-  }, []);
+  }, [loadTasks]);
 
 
   return (

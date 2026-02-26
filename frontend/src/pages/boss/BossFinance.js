@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState ,useCallback} from "react";
 import api from "../../api/api";
 
 export default function BossFinance() {
@@ -17,15 +17,15 @@ export default function BossFinance() {
       .then(res => setEntries(res.data));
   };
 
-  const loadMonthlyReport = () => {
+  const loadMonthlyReport = useCallback(async () => {
     api.get(`boss/monthly-report/?month=${currentMonth}`)
       .then(res => setReport(res.data));
-  };
+  }, []);
 
   useEffect(() => {
     loadEntries();
     loadMonthlyReport();
-  }, []);
+  }, [loadMonthlyReport]);
 
   const addEntry = async () => {
     await api.post("boss/daily-ledger/", {

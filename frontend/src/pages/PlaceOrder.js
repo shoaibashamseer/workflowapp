@@ -76,7 +76,7 @@ export default function PlaceOrder() {
 
     const updated = [...items];
 
-    if (updated[index].materials.find(m => m.variantId == variantId)) return;
+    if (updated[index].materials.find(m => m.variantId === variantId)) return;
 
     updated[index].materials.push({
       variantId,
@@ -132,7 +132,7 @@ export default function PlaceOrder() {
       let total = 0;
 
       items.forEach(item => {
-        const product = products.find(p => p.id == item.productId);
+        const product = products.find(p => p.id === item.productId);
         const price = getProductPrice(product);
         total += price * (item.quantity || 0);
       });
@@ -220,7 +220,7 @@ export default function PlaceOrder() {
 
       {/* ================= ITEMS ================= */}
       {items.map((item, index) => {
-        const product = products.find(p => p.id == item.productId);
+        const product = products.find(p => p.id === item.productId);
         const pricePerUnit = getProductPrice(product);
         const total = pricePerUnit * (item.quantity || 0);
 
@@ -287,7 +287,7 @@ export default function PlaceOrder() {
             </select>
 
             {item.materials.map((mat, mIndex) => {
-              const variant = materialVariants.find(v => v.id == mat.variantId);
+              const variant = materialVariants.find(v => v.id === mat.variantId);
 
               return (
                 <div key={mIndex} style={{ marginTop: "6px" }}>

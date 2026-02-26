@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState , useCallback } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../api/api";
 import "../../styles/manager.css";
@@ -11,15 +11,15 @@ function WorkflowStepsManager() {
   const [role, setRole] = useState("");
   const [sequence, setSequence] = useState("");
 
-  const loadSteps = () => {
+  const loadSteps = useCallback(async() => {
     api
       .get(`manager/workflow-steps/?workflow=${workflowId}`)
       .then((res) => setSteps(res.data));
-  };
+  }, []);
 
   useEffect(() => {
     loadSteps();
-  }, [workflowId]);
+  }, [workflowId, loadSteps]);
 
   const createStep = () => {
     if (!name.trim()) return;
