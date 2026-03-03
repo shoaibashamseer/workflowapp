@@ -6,7 +6,7 @@ export default function WorkerDashboard() {
   const [tasks, setTasks] = useState([]);
   const [showOthers, setShowOthers] = useState(false);
 
-  const role = localStorage.getItem("role");
+  //const role = localStorage.getItem("role");
   const username = localStorage.getItem("username");
 
   const loadTasks = useCallback(async () => {
