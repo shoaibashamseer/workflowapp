@@ -110,7 +110,7 @@ class Order(models.Model):
     )
 
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
-    created_by =  models.ForeignKey(
+    created_by = models.ForeignKey(
     settings.AUTH_USER_MODEL,
     on_delete=models.SET_NULL,
     null=True,

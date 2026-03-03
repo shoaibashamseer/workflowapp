@@ -196,7 +196,7 @@ function App() {
           element={
             <ProtectedRoute
               role={role}
-              allow={["designer","printer","helper","worker"]}
+              allow={["designer","printer","helper","worker","setup","finisher"]}
             >
               <WorkerDashboard />
             </ProtectedRoute>

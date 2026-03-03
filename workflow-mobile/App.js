@@ -3,17 +3,20 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import LoginScreen from "./screens/LoginScreen";
 import TasksScreen from "./screens/TasksScreen";
+import PlaceOrder from "./screens/PlaceOrder";
 import ChangePasswordScreen from "./screens/ChangePasswordScreen";
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [mustChange, setMustChange] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [screen, setScreen] = useState("login");
 
   // 🔐 Check saved auth on app start
   useEffect(() => {
     const loadAuth = async () => {
       const token = await AsyncStorage.getItem("token");
+      const role = await AsyncStorage.getItem("role");
       const userStr = await AsyncStorage.getItem("user");
       const mcp = await AsyncStorage.getItem("must_change_password");
 
@@ -32,6 +35,7 @@ export default function App() {
   const handleLogin = (userData, mustChangePassword) => {
     setUser(userData);
     setMustChange(mustChangePassword);
+    setScreen("tasks");
   };
 
   // 🚪 Logout
@@ -52,6 +56,24 @@ export default function App() {
   if (mustChange) {
     return <ChangePasswordScreen onDone={() => setMustChange(false)} />;
   }
+
+  if (screen === "tasks") {
+      return (
+        <TasksScreen
+          user={user}
+          onLogout={handleLogout}
+          goToPlaceOrder={() => setScreen("placeOrder")}
+        />
+      );
+    }
+
+  if (screen === "placeOrder") {
+      return (
+        <PlaceOrder
+          onBack={() => setScreen("tasks")}
+        />
+      );
+    }
 
   return <TasksScreen user={user} onLogout={handleLogout} />;
 }

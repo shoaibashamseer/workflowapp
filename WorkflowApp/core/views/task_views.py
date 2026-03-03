@@ -16,7 +16,6 @@ class TaskViewSet(ModelViewSet):
         qs = Task.objects.select_related(
             "workflow_step",
             "workflow_step__role",
-            "assigned_to",
             "order",
             "order__customer",
             "order_item",

@@ -1,29 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  SafeAreaView,
 } from "react-native";
 import api from "../api/api";
 
-export default function TasksScreen({ user, onLogout }) {
+export default function TasksScreen({ user, onLogout,  goToPlaceOrder }) {
   const [tasks, setTasks] = useState([]);
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [activeTab, setActiveTab] = useState("my"); // my | completed | queue
 
-  const loadTasks = async () => {
-    try {
-      const res = await api.get("tasks/");
-      setTasks(res.data || []);
-    } catch (err) {
-      console.log("Task load error:", err);
-    }
-  };
+  const loadTasks = useCallback(async () => {
+    const res = await api.get("tasks/");
+    //console.log("TASKS API:", res.data);
+    //console.log("USER:", user);//to debug
+    setTasks(res.data);
+  }, []);
 
   useEffect(() => {
     loadTasks();
-  }, []);
+  }, [loadTasks]);
 
   const startTask = async (id) => {
     await api.post(`tasks/${id}/start/`);
@@ -35,252 +34,300 @@ export default function TasksScreen({ user, onLogout }) {
     loadTasks();
   };
 
-  /* ===== FILTER TASKS ===== */
+  /* ================= FILTERS ================= */
 
-  const readyTasks = tasks.filter((t) => t.status === "ready");
-  const inProgressTasks = tasks.filter((t) => t.status === "in_progress");
-  const completedTasks = tasks.filter((t) => t.status === "completed");
-
-  /* ===== NEXT PRIORITY TASK ===== */
-
-  const nextTask = readyTasks.find(
-    (t) => user && t.workflow_role_name === user.role
+  const myInProgress = tasks.filter(
+    t => t.status === "in_progress" && t.assigned_to === user.id
   );
 
-  const isUrgent = (task) => {
-      if (!task.order_delivery_date) return false;
+  const myReady = tasks.filter(
+    t => t.status === "ready" && t.assigned_to === user.id
+  );
 
-      const today = new Date();
-      const delivery = new Date(task.order_delivery_date);
+  const completed = tasks.filter(
+    t => t.status === "completed" && t.assigned_to === user.id
+  );
 
-      const diffDays = (delivery - today) / (1000 * 60 * 60 * 24);
+  const queue = tasks.filter(
+    t => t.status === "ready"  && t.assigned_to !== user.id
+  );
 
-      return diffDays <= 1;
-};
+  const renderMyTasks = () => (
+    <>
+      {myInProgress.map(task => (
+        <TaskCard
+          key={task.id}
+          task={task}
+          type="progress"
+          onComplete={completeTask}
+        />
+      ))}
+
+      {myReady.map(task => (
+        <TaskCard
+          key={task.id}
+          task={task}
+          type="ready"
+          onStart={startTask}
+        />
+      ))}
+    </>
+  );
+
+  const renderCompleted = () =>
+    completed.map(task => (
+      <TaskCard key={task.id} task={task} type="completed" />
+    ));
+
+  const renderQueue = () => (
+    <>
+     {queue.map(task => (
+        <TaskCard
+          key={task.id}
+          task={task}
+          type="ready"
+          onStart={startTask}
+        />
+      ))}
+    </>
+  );
+ /* const renderQueue = () =>
+    queue.map(task => (
+      <TaskCard key={task.id} task={task}  type="queue" />
+    ));*/
 
   return (
-    <ScrollView style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.headerText}>My Tasks</Text>
-        <TouchableOpacity onPress={onLogout}>
-          <Text style={styles.logout}>Logout</Text>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={{ flex: 1 }}>
+      <View style={styles.container}>
 
-      {/* NEXT TASK */}
-      {nextTask && (
-        <View style={styles.nextCard}>
-          <Text style={styles.nextTitle}>⭐ Next Task</Text>
-          <Text style={styles.title}>{nextTask.workflow_step_name}</Text>
+        {/* HEADER */}
 
-          <Text style={styles.customer}>
-            👤 {nextTask.customer_name}
-            {nextTask.customer_company
-              ? ` (${nextTask.customer_company})`
-              : ""}
-          </Text>
+        <View style={styles.header}>
 
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => startTask(nextTask.id)}
-          >
-            <Text style={styles.buttonText}>Start Now</Text>
-          </TouchableOpacity>
+          <Text style={styles.headerText}>My Page</Text>
+
+
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.placeBtn}
+              onPress={ goToPlaceOrder }
+            >
+              <Text style={styles.placeText}> + Order</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+              <Text style={styles.logout}>Logout</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      )}
 
-      {/* ACTIVE TASKS */}
-      <Text style={styles.section}>Active Tasks</Text>
+        {/* TAB BAR */}
+        <View style={styles.tabBar}>
+          <TabButton
+            title="My Tasks"
+            active={activeTab === "my"}
+            onPress={() => setActiveTab("my")}
+          />
+          <TabButton
+            title="Completed"
+            active={activeTab === "completed"}
+            onPress={() => setActiveTab("completed")}
+          />
+          <TabButton
+            title="Queue"
+            active={activeTab === "queue"}
+            onPress={() => setActiveTab("queue")}
+          />
+        </View>
 
-      {[...readyTasks, ...inProgressTasks].map((task) => {
-        const isMyRole =
-          user && task.workflow_role_name === user.role;
+        {/* CONTENT */}
+        <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+          {activeTab === "my" && renderMyTasks()}
+          {activeTab === "completed" && renderCompleted()}
+          {activeTab === "queue" && renderQueue()}
+        </ScrollView>
 
-     {isUrgent(task) && (
-          <Text style={{ color: "red", fontWeight: "bold" }}>
-            🔥 Urgent
-          </Text>
-      )}
-        return (
-          <View
-            key={task.id}
-            style={[styles.card, isUrgent(task) && styles.urgentCard,]}
-          >
-            <Text style={styles.title}>{task.workflow_step_name}</Text>
-
-            <Text style={styles.customer}>
-              👤 {task.customer_name}
-              {task.customer_company
-                ? ` (${task.customer_company})`
-                : ""}
-            </Text>
-
-            <Text style={styles.sub}>
-              📦 {task.product_name} × {task.quantity}
-            </Text>
-
-            <Text style={styles.sub}>
-              Status:{" "}
-              <Text style={styles[task.status]}>
-                {task.status.toUpperCase()}
-              </Text>
-            </Text>
-
-            {task.assigned_to_name && (
-              <Text style={styles.assigned}>
-                👷 {task.assigned_to_name}
-              </Text>
-            )}
-
-            {/* ACTIONS */}
-            {task.status === "ready" && (
-              <TouchableOpacity
-                style={styles.button}
-                onPress={() => startTask(task.id)}
-              >
-                <Text style={styles.buttonText}>Claim</Text>
-              </TouchableOpacity>
-            )}
-
-            {task.status === "in_progress" &&
-              user &&
-              task.assigned_to === user.id && (
-                <TouchableOpacity
-                  style={styles.completeButton}
-                  onPress={() => completeTask(task.id)}
-                >
-                  <Text style={styles.buttonText}>Complete</Text>
-                </TouchableOpacity>
-              )}
-          </View>
-        );
-      })}
-
-      {/* COMPLETED TOGGLE */}
-      <TouchableOpacity
-        onPress={() => setShowCompleted(!showCompleted)}
-      >
-        <Text style={styles.toggle}>
-          {showCompleted ? "Hide Completed" : "Show Completed"}
-        </Text>
-      </TouchableOpacity>
-
-      {showCompleted &&
-        completedTasks.map((task) => (
-          <View key={task.id} style={styles.completedCard}>
-            <Text>{task.workflow_step_name}</Text>
-          </View>
-        ))}
-    </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
 
+/* ================= REUSABLE CARD ================= */
+
+function TaskCard({ task, type, onStart, onComplete }) {
+  return (
+    <View style={[styles.card, type === "progress" && styles.myCard]}>
+      <Text style={styles.title}>{task.workflow_step_name}</Text>
+
+      <Text style={styles.customer}>
+        👤 {task.customer_name}
+      </Text>
+
+      <Text style={styles.sub}>
+        📦 {task.product_name} × {task.quantity}
+      </Text>
+
+      {type === "ready" && (
+        <TouchableOpacity
+          style={styles.startButton}
+          onPress={() => onStart(task.id)}
+        >
+          <Text style={styles.buttonText}>Claim / Start</Text>
+        </TouchableOpacity>
+      )}
+
+      {type === "progress" && (
+        <TouchableOpacity
+          style={styles.completeButton}
+          onPress={() => onComplete(task.id)}
+        >
+          <Text style={styles.buttonText}>Complete</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+/* ================= TAB BUTTON ================= */
+
+function TabButton({ title, active, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[styles.tab, active && styles.activeTab]}
+      onPress={onPress}
+    >
+      <Text style={[styles.tabText, active &&  styles.activeTabText]}>
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     backgroundColor: "#f4f6f8",
-    padding: 12,
+    paddingHorizontal: 15,
   },
 
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 15,
+    alignItems: "center",
+    paddingVertical: 10,
   },
 
   headerText: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "bold",
+  },
+
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
 
   logout: {
-    color: "#d9534f",
+    color: "#fff",
     fontWeight: "600",
-    fontSize: 16,
+
+    //color: "#dc2626",
+
+  },
+  logoutBtn: {
+    backgroundColor: "#dc2626",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
 
-  section: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginVertical: 10,
+  placeBtn: {
+    backgroundColor: "#2563eb",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
 
-  nextCard: {
-    backgroundColor: "#ecfdf5",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#10b981",
+  placeText: {
+    color: "#fff",
+    fontWeight: "600",
   },
 
-  nextTitle: {
-    fontWeight: "bold",
-    marginBottom: 5,
+  tabBar: {
+    flexDirection: "row",
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    //backgroundColor: "#e5e7eb",
+    alignItems: "center",
+    //borderRadius: 6,
+    //marginRight: 5,
+  },
+
+  activeTab: {
+    borderBottomWidth: 3,
+    borderBottomColor: "#2563EB",
+  },
+
+  tabText: {
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+
+  activeTabText: {
+    color: "#2563EB",
   },
 
   card: {
     backgroundColor: "#fff",
     padding: 15,
-    marginBottom: 12,
-    borderRadius: 8,
+    marginBottom: 10,
+    borderRadius: 10,
     elevation: 2,
   },
 
-  myRoleCard: {
+  myCard: {
     borderLeftWidth: 5,
-    borderLeftColor: "#28a745",
+    borderLeftColor: "#16a34a",
   },
 
   title: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "bold",
   },
 
   sub: {
     fontSize: 13,
     color: "#555",
-  },
-
-  assigned: {
     marginTop: 4,
-    fontStyle: "italic",
   },
 
   customer: {
     fontSize: 14,
     fontWeight: "600",
     marginTop: 4,
-    color: "#111827",
   },
 
-  ready: {
-    color: "#f0ad4e",
-    fontWeight: "bold",
-  },
-
-  in_progress: {
-    color: "#0275d8",
-    fontWeight: "bold",
-  },
-
-  completed: {
-    color: "#777",
-    fontWeight: "bold",
-  },
-
-  button: {
-    backgroundColor: "#0275d8",
+  startButton: {
+    backgroundColor: "#2563eb",
     padding: 10,
     borderRadius: 6,
-    marginTop: 10,
+    marginTop: 8,
   },
 
   completeButton: {
-    backgroundColor: "#5cb85c",
+    backgroundColor: "#16a34a",
     padding: 10,
     borderRadius: 6,
-    marginTop: 10,
+    marginTop: 8,
   },
 
   buttonText: {
@@ -288,23 +335,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600",
   },
-
-  toggle: {
-    color: "#2563eb",
-    marginVertical: 15,
-    textAlign: "center",
-    fontWeight: "600",
-  },
-
-  completedCard: {
-    backgroundColor: "#f3f4f6",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 5,
-  },
-  urgentCard: {
-    borderLeftWidth: 5,
-    borderLeftColor: "#ef4444",
-  },
-
 });

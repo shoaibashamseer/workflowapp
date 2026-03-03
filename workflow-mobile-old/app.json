@@ -1,38 +1,36 @@
 {
   "expo": {
-    "name": "WorkflowApp",
+    "name": "workflow-mobile",
     "slug": "workflow-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
     "scheme": "workflowmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.d2print.workflowmobile",
-      "supportsTablet": false
+      "supportsTablet": true
     },
     "android": {
+      "permissions": [
+        "INTERNET"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#E6F4FE"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.d2print.workflowmobile"
     },
     "web": {
-      "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "output": "static"
+
     },
     "plugins": [
-
+      "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
