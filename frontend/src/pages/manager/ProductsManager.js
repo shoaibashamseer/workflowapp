@@ -10,7 +10,6 @@ function ProductsManager() {
   const [form, setForm] = useState({
     name: "",
     description: "",
-    base_cost: "",
     wholesale_price: "",
     retail_price: "",
   });
@@ -29,7 +28,6 @@ function ProductsManager() {
     setForm({
       name: product.name,
       description: product.description || "",
-      base_cost: product.base_cost,
       wholesale_price: product.wholesale_price || "",
       retail_price: product.retail_price || "",
     });
@@ -40,7 +38,6 @@ function ProductsManager() {
     setForm({
       name: "",
       description: "",
-      base_cost: "",
       wholesale_price: "",
       retail_price: "",
     });
@@ -77,7 +74,6 @@ function ProductsManager() {
           <tr>
             <th>Name</th>
             <th>Description</th>
-            <th>Base Cost</th>
             <th>Wholesale Price</th>
             <th>Retail Price</th>
             <th>Actions</th>
@@ -117,20 +113,7 @@ function ProductsManager() {
                 )}
               </td>
 
-              {/* BASE COST */}
-              <td>
-                {editingProduct === p.id ? (
-                  <input
-                    className="table-input"
-                    value={form.base_cost}
-                    onChange={e =>
-                      setForm({ ...form, base_cost: e.target.value })
-                    }
-                  />
-                ) : (
-                  `₹ ${p.base_cost}`
-                )}
-              </td>
+
 
               {/* WHOLESALE PRICE */}
               <td>

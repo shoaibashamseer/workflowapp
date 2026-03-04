@@ -13,6 +13,8 @@ class TaskViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        user = self.request.user
+
         qs = Task.objects.select_related(
             "workflow_step",
             "workflow_step__role",
@@ -22,13 +24,21 @@ class TaskViewSet(ModelViewSet):
             "order_item__product",
         ).all()
 
-        role = self.request.query_params.get("role")
-        if role:
-            qs = qs.filter(workflow_step__role__name=role)
+        user_role = getattr(user.userprofile, "role", None)
+        user_role = getattr(user.userprofile, "role", None)
 
-        # hide pending tasks from worker view
+        if user_role:
+            qs = qs.filter(
+                workflow_step__role=user_role
+            )
+
+        # Smart ordering:
+        # 1️⃣ My in-progress first
+        # 2️⃣ Ready tasks next
+        # 3️⃣ Others last
         qs = qs.annotate(
             status_priority=Case(
+                When(status="in_progress", assigned_to=user, then=0),
                 When(status="ready", then=1),
                 When(status="in_progress", then=2),
                 default=3,
@@ -36,15 +46,16 @@ class TaskViewSet(ModelViewSet):
             )
         )
 
-        return qs.order_by("order__delivery_date", "status_priority", "id")
+        return qs.order_by("status_priority", "order__delivery_date", "id")
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def start(self, request, pk=None):
-        task = self.get_object()
+        task = Task.objects.select_for_update().get(pk=pk)
+
         if task.status != "ready":
             return Response(
-                {"error": "Task is not available"},
+                {"error": "Task already claimed"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -52,6 +63,7 @@ class TaskViewSet(ModelViewSet):
         task.assigned_to = request.user
         task.started_at = timezone.now()
         task.save()
+
         return Response({"message": "started"}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"])

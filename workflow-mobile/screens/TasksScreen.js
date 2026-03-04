@@ -4,9 +4,9 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
+  StyleSheet
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import api from "../api/api";
 
 export default function TasksScreen({ user, onLogout,  goToPlaceOrder }) {
@@ -110,7 +110,11 @@ export default function TasksScreen({ user, onLogout,  goToPlaceOrder }) {
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.placeBtn}
-              onPress={ goToPlaceOrder }
+              //onPress={ goToPlaceOrder }
+              onPress={() => {
+                  console.log("ORDER BUTTON CLICKED");
+                  goToPlaceOrder && goToPlaceOrder();
+              }}
             >
               <Text style={styles.placeText}> + Order</Text>
             </TouchableOpacity>
@@ -227,7 +231,7 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+
   },
 
   logout: {
@@ -249,6 +253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
+    marginRight: 10,
   },
 
   placeText: {

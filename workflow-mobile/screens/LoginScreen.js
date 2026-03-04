@@ -8,32 +8,32 @@ export default function LoginScreen({ onLogin }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
- const login = async () => {
-  try {
-    const res = await api.post("auth/login/", {
-      username,
-      password,
-    });
+  const login = async () => {
+      try {
+        const res = await api.post("auth/login/", {
+          username,
+          password,
+        });
 
-    const userData = {
-      id: res.data.id,
-      username: res.data.username,
-      role: res.data.role,
-    };
+        const userData = {
+          id: res.data.id,
+          username: res.data.username,
+          role: res.data.role,
+        };
 
-    await AsyncStorage.setItem("token", res.data.token);
-    await AsyncStorage.setItem("user", JSON.stringify(userData));
-    await AsyncStorage.setItem(
-      "must_change_password",
-      String(res.data.must_change_password)
-    );
+        await AsyncStorage.setItem("token", res.data.token);
+        await AsyncStorage.setItem("user", JSON.stringify(userData));
+        await AsyncStorage.setItem(
+          "must_change_password",
+          String(res.data.must_change_password)
+        );
 
-    onLogin(userData);
-  } catch (err) {
-    console.log("login error:", err.response?.data);
-    setError(JSON.stringify(err.response?.data));
-  }
-};
+        onLogin(userData);
+      } catch (err) {
+            console.log("login error:", err.response?.data);
+            setError(JSON.stringify(err.response?.data));
+        }
+  };
 
   return (
     <View style={{ padding: 20 }}>

@@ -120,15 +120,16 @@ export default function PlaceOrder() {
         })),
       };
 
-      await api.post("orders/", payload);
-      alert("Order Created Successfully");
+         await api.post("orders/", payload);
+         alert("Order Created Successfully");
 
     } catch (err) {
       console.log("ORDER ERROR:", err.response?.data);
       alert(JSON.stringify(err.response?.data));
-    }
+      }
   };
-      const calculateGrandTotal = () => {
+
+  const calculateGrandTotal = () => {
       let total = 0;
 
       items.forEach(item => {
@@ -138,7 +139,7 @@ export default function PlaceOrder() {
       });
 
       return total;
-        };
+  };
 
 
   /* ================= UI ================= */
@@ -156,7 +157,7 @@ export default function PlaceOrder() {
           value={customerId}
           onChange={e => setCustomerId(e.target.value)}
         >
-          <option value="">Select Existing Customer</option>
+        <option value="">Select Existing Customer</option>
           {customers.map(c => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -231,7 +232,7 @@ export default function PlaceOrder() {
             <select
               className="form-input"
               value={item.productId}
-              onChange={e => updateItem(index, "productId", e.target.value)}
+              onChange={e => updateItem(index, "productId", Number(e.target.value))}
             >
               <option value="">Select Product</option>
               {products.map(p => (
@@ -311,23 +312,23 @@ export default function PlaceOrder() {
       })}
 
      {/* GRAND TOTAL CARD */}
-    <div className="form-card" style={{ marginTop: "20px" }}>
-      <h2 style={{ marginBottom: "10px" }}>
-        Grand Total: ₹{calculateGrandTotal()}
-      </h2>
-    </div>
+      <div className="form-card" style={{ marginTop: "20px" }}>
+          <h2 style={{ marginBottom: "10px" }}>
+            Grand Total: ₹{calculateGrandTotal()}
+          </h2>
+      </div>
 
-    <button className="action-btn" onClick={addItem}>
-      ➕ Add Item
-    </button>
+      <button className="action-btn" onClick={addItem}>
+         ➕ Add Item
+      </button>
 
-    <button
-      className="action-btn"
-      style={{ marginLeft: "10px", background: "#16a34a" }}
-      onClick={submitOrder}
-    >
-      Submit Order
-</button>
+      <button
+          className="action-btn"
+          style={{ marginLeft: "10px", background: "#16a34a" }}
+          onClick={submitOrder}
+        >
+          Submit Order
+      </button>
 
     </div>
   );
