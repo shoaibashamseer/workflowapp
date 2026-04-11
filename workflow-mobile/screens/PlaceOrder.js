@@ -1,110 +1,310 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback, memo } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
+import Modal from "react-native-modal";
+import { Calendar } from "react-native-calendars";
 import api from "../api/api";
-import DateTimePicker from "@react-native-community/datetimepicker";
 
-export default function PlaceOrder({  onBack }) {
+const EMPTY_ITEM = {
+  productId: "",
+  workflowId: "",
+  quantity: 1,
+  features: [],
+  materials: [],
+};
 
+const SearchSelectModal = memo(function SearchSelectModal({
+  visible,
+  title,
+  data,
+  labelKey = "name",
+  onClose,
+  onSelect,
+}) {
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return data.filter((item) =>
+      String(item[labelKey]).toLowerCase().startsWith(q)
+    );
+  }, [data, search, labelKey]);
+
+  return (
+    <Modal isVisible={visible} onBackdropPress={onClose} style={{ justifyContent: "flex-end", margin: 0 }}>
+      <View style={styles.modalBox}>
+        <Text style={styles.modalTitle}>{title}</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={`Search ${title}`}
+          value={search}
+          onChangeText={setSearch}
+        />
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id.toString()}
+          style={{ maxHeight: 300 }}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.searchItem}
+              onPress={() => {
+                onSelect(item);
+                setSearch("");
+                onClose();
+              }}
+            >
+              <Text>{item[labelKey]}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    </Modal>
+  );
+});
+
+const OrderItemCard = memo(function OrderItemCard({
+  item,
+  index,
+  products,
+  workflows,
+  productMap,
+  materialVariants,
+  addMaterial,
+  updateMaterialQty,
+  getProductPrice,
+  onUpdate,
+}) {
+  const [productModal, setProductModal] = useState(false);
+  const [workflowModal, setWorkflowModal] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState("");
+  const [showMaterialList, setShowMaterialList] = useState(false);
+  const product = productMap[item.productId];
+  const workflow = workflows.find((w) => w.id === item.workflowId);
+  const pricePerUnit = getProductPrice(product);
+  const total = pricePerUnit * Number(item.quantity || 0);
+  const filteredMaterials = useMemo(() => {
+      return materialVariants.filter(m =>
+        `${m.material_name} ${m.name}`
+          .toLowerCase()
+          .startsWith(materialSearch.toLowerCase())
+      );
+    }, [materialSearch, materialVariants]);
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.subtitle}>Item {index + 1}</Text>
+
+      <TouchableOpacity style={styles.input} onPress={() => setProductModal(true)}>
+        <Text>{product?.name || "Select Product"}</Text>
+      </TouchableOpacity>
+
+      {product && <Text style={styles.price}>Price per unit: ₹{pricePerUnit}</Text>}
+
+      <TouchableOpacity style={styles.input} onPress={() => setWorkflowModal(true)}>
+        <Text>{workflow?.name || "Select Workflow"}</Text>
+      </TouchableOpacity>
+
+      <TextInput
+        style={styles.input}
+        keyboardType="numeric"
+        value={String(item.quantity)}
+        onChangeText={(v) => onUpdate(index, "quantity", parseInt(v) || 1)}
+        placeholder="Quantity"
+      />
+
+      {product && <Text style={styles.total}>Total Price: ₹{total}</Text>}
+
+      <SearchSelectModal
+        visible={productModal}
+        title="Product"
+        data={products}
+        onClose={() => setProductModal(false)}
+        onSelect={(selected) => onUpdate(index, "productId", selected.id)}
+      />
+     <Text style={{ marginTop: 10, fontWeight: "600" }}>
+          Materials
+        </Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Search Material"
+          value={materialSearch}
+          onChangeText={(text) => {
+            setMaterialSearch(text);
+            setShowMaterialList(true);
+          }}
+        />
+
+        {showMaterialList && materialSearch.length > 0 && (
+          <View style={styles.dropdown}>
+            {filteredMaterials.map(m => (
+              <TouchableOpacity
+                key={m.id}
+                onPress={() => {
+                  addMaterial(index, m.id);
+                  setMaterialSearch("");
+                  setShowMaterialList(false);
+                }}
+              >
+                <Text style={styles.dropdownItem}>
+                  {m.material_name} - {m.name} (Stock: {m.stock})
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        {item.materials.map((mat, mIndex) => {
+            const variant = materialVariants.find(v => v.id === mat.variantId);
+
+            return (
+                <View key={mIndex} style={{ marginTop: 8 }}>
+                  <Text>
+                    {variant?.material_name} - {variant?.name}
+                  </Text>
+
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="numeric"
+                    value={String(mat.quantity)}
+                    onChangeText={(v) =>
+                      updateMaterialQty(index, mIndex, v || 1)
+                    }
+                    placeholder="Quantity Used"
+                  />
+                </View>
+              );
+            })}
+
+      <SearchSelectModal
+        visible={workflowModal}
+        title="Workflow"
+        data={workflows}
+        onClose={() => setWorkflowModal(false)}
+        onSelect={(selected) => onUpdate(index, "workflowId", selected.id)}
+      />
+    </View>
+  );
+});
+
+export default function PlaceOrder({ onBack }) {
   const [products, setProducts] = useState([]);
   const [workflows, setWorkflows] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [materialVariants, setMaterialVariants] = useState([]);
 
   const [customerId, setCustomerId] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showCustomerList, setShowCustomerList] = useState(false);
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+
+  const filteredCustomers = useMemo(() => {
+  return customers.filter(c =>
+    c.name.toLowerCase().startsWith(customerSearch.toLowerCase())
+  );
+}, [customerSearch, customers]);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [customerType, setCustomerType] = useState("retail");
 
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateModal, setDateModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [deliveryMethod, setDeliveryMethod] = useState("bus");
   const [orderGetMethod, setOrderGetMethod] = useState("direct");
 
-
-  const [items, setItems] = useState([
-    {
-      productId: "",
-      workflowId: "",
-      quantity: 1,
-      features: [],
-      materials: [],
-    },
-  ]);
-
-  /* LOAD DATA */
+  const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
+  const [materialVariants, setMaterialVariants] = useState([]);
 
   useEffect(() => {
-    api.get("manager/products/").then(res => setProducts(res.data));
-    api.get("manager/workflows/").then(res => setWorkflows(res.data));
-    api.get("customers/").then(res => setCustomers(res.data));
-    api.get("manager/raw-material-variants/").then(res =>
-      setMaterialVariants(res.data)
-    );
+    const loadData = async () => {
+      const [p, w, c] = await Promise.all([
+        api.get("manager/products/"),
+        api.get("manager/workflows/"),
+        api.get("customers/"),
+      ]);
+      setProducts(p.data);
+      setWorkflows(w.data);
+      setCustomers(c.data);
+    };
+    loadData();
   }, []);
 
-  /* HELPERS */
+  useEffect(() => {
+      api.get("manager/raw-material-variants/")
+        .then(res => setMaterialVariants(res.data));
+    }, []);
 
-  const getSelectedCustomer = () => {
-    return customers.find(c => c.id === parseInt(customerId));
-  };
+  const customerMap = useMemo(() => Object.fromEntries(customers.map(c => [c.id, c])), [customers]);
+  const productMap = useMemo(() => Object.fromEntries(products.map(p => [p.id, p])), [products]);
 
-  const getProductPrice = (product) => {
-    const customer = getSelectedCustomer();
-    if (!customer || !product) return 0;
+  const selectedCustomer = customerMap[customerId];
 
-    return customer.customer_type === "wholesale"
+  const getProductPrice = useCallback((product) => {
+    if (!selectedCustomer || !product) return 0;
+    return selectedCustomer.customer_type === "wholesale"
       ? product.wholesale_price
       : product.retail_price;
-  };
+  }, [selectedCustomer]);
 
-  const updateItem = (index, field, value) => {
-    const updated = [...items];
-    updated[index][field] = value;
-    setItems(updated);
-  };
-
-  const addItem = () => {
-    setItems([
-      ...items,
-      {
-        productId: "",
-        workflowId: "",
-        quantity: 1,
-        features: [],
-        materials: [],
-      },
-    ]);
-  };
-
-  const addMaterial = (index, variantId) => {
-    if (!variantId) return;
-
-    const updated = [...items];
-
-    if (updated[index].materials.find(m => m.variantId === variantId)) return;
-
-    updated[index].materials.push({
-      variantId,
-      quantity: 1,
+  const updateItem = useCallback((index, field, value) => {
+    setItems((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
     });
+  }, []);
 
-    setItems(updated);
-  };
+  const addItem = useCallback(() => setItems((prev) => [...prev, { ...EMPTY_ITEM }]), []);
+  const addMaterial = (itemIndex, variantId) => {
+      if (!variantId) return;
 
-  /* SUBMIT ORDER */
+      setItems(prev => {
+        const updated = [...prev];
 
-  const submitOrder = async () => {
+        const exists = updated[itemIndex].materials.find(
+          m => m.variantId === variantId
+        );
+
+        if (exists) return updated;
+
+       setItems(prev => {
+          const updated = [...prev];
+          const item = { ...updated[itemIndex] };
+
+          item.materials = [...item.materials, {
+            variantId,
+            quantity: 1,
+          }];
+
+          updated[itemIndex] = item;
+          return updated;
+        });
+
+        return updated;
+      });
+    };
+
+    const updateMaterialQty = (itemIndex, matIndex, qty) => {
+      setItems(prev => {
+        const updated = [...prev];
+        updated[itemIndex].materials[matIndex].quantity = qty;
+        return updated;
+      });
+    };
+  const grandTotal = useMemo(() => items.reduce((sum, item) => {
+    const product = productMap[item.productId];
+    return sum + getProductPrice(product) * Number(item.quantity || 0);
+  }, 0), [items, productMap, getProductPrice]);
+
+  const submitOrder = async () =>{
      if (!customerId && !newCustomerName.trim()) {
         Alert.alert("Customer Required", "Please select or add a customer.");
         return;
@@ -125,26 +325,36 @@ export default function PlaceOrder({  onBack }) {
         const res = await api.post("customers/", {
           name: newCustomerName,
           phone: newCustomerPhone,
+          customer_type: customerType,
         });
 
         finalCustomerId = res.data.id;
       }
 
+      const validItems = items.filter(
+          (item) => item.productId && item.workflowId
+        );
+
+        if (validItems.length !==  items.length) {
+          Alert.alert("Invalid Items", "Please select product and workflow.");
+          return;
+        }
+
       const payload = {
         customer: Number(finalCustomerId),
-        delivery_date: deliveryDate ? deliveryDate.split("T")[0] : "",
+        delivery_date: deliveryDate ? deliveryDate.split("T")[0] : null,
         delivery_method: deliveryMethod,
         order_get_method: orderGetMethod,
 
-        items: items.map(item => ({
+        items: validItems.map(item => ({
           product: Number(item.productId),
           workflow: Number(item.workflowId),
           quantity: Number(item.quantity),
 
-          materials: item.materials.map(m => ({
+          features: item.materials?.map(m => ({
             variant: Number(m.variantId),
-            quantity_used: Number(m.quantity),
-          })),
+            quantity_used: parseInt(m.quantity) || 1,
+          })) || [],
         })),
       };
 
@@ -152,271 +362,191 @@ export default function PlaceOrder({  onBack }) {
 
       Alert.alert("Success", "Order Created Successfully",[{ text : "ok"}]);
 
-    } catch (err) {
-     const data = err.response?.data;
+    }catch (err) {
+      console.log("STATUS:", err.response?.status);
+      console.log("DATA:", err.response?.data);
 
-     let message = "Something went wrong while creating the order.";
-
-     if (data?.customer) {
-       message = "Please select a valid customer.";
-     }
-
-     if (data?.items) {
-      message = "One or more items are invalid.";
-     }
-
-    if (data?.non_field_errors) {
-      message = data.non_field_errors.join("\n");
-    }
-
-    Alert.alert("Order Failed", message);
-
-   } finally {
-    setLoading(false);
-   }
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        Alert.alert("Auth Error", "Login expired or token missing");
+      } else if (typeof err.response?.data === "string") {
+        Alert.alert("Server Error", "Backend error or permission issue");
+      } else {
+        Alert.alert("Error", JSON.stringify(err.response?.data));
+      }
+    }finally {
+          setLoading(false);
+        }
  };
 
-  const calculateGrandTotal = () => {
-
-    let total = 0;
-
-    items.forEach(item => {
-
-      const product = products.find(p => p.id === item.productId);
-
-      const price = getProductPrice(product);
-
-      total += price * (item.quantity || 0);
-    });
-
-    return total;
-  };
-
-  return (
-
-    <ScrollView style={styles.container}>
-
+  const headerComponent = (
+    <>
       <View style={styles.header}>
         <Text style={styles.title}>Advanced Order</Text>
-        <TouchableOpacity onPress={onBack}>
-          <Text style={styles.back}>← Back</Text>
-        </TouchableOpacity>
+        <TouchableOpacity onPress={onBack}><Text style={styles.back}>← Back</Text></TouchableOpacity>
       </View>
-
-      {/* CUSTOMER */}
-
-      <Text style={styles.label}>Select Customer</Text>
-
-      <Picker
-        selectedValue={customerId}
-        onValueChange={(itemValue) => setCustomerId(itemValue)}
-      >
-        <Picker.Item label="Select Customer" value="" />
-
-        {customers.map(c => (
-          <Picker.Item key={c.id} label={c.name} value={c.id} />
-        ))}
-
-      </Picker>
-
       <TextInput
-        style={styles.input}
-        placeholder="New Customer Name"
-        value={newCustomerName}
-        onChangeText={setNewCustomerName}
-      />
+          style={styles.input}
+          placeholder="Search Customer"
+          value={customerSearch}
+          onChangeText={(text) => {
+            setCustomerSearch(text);
+            setShowCustomerList(true);
+          }}
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Customer Phone"
-        value={newCustomerPhone}
-        onChangeText={setNewCustomerPhone}
-      />
-      <Text style={styles.label}>Delivery Date</Text>
+        {showCustomerList && customerSearch.length > 0 && (
+          <View style={styles.dropdown}>
+            {filteredCustomers.map(c => (
+              <TouchableOpacity
+                key={c.id}
+                onPress={() => {
+                  setCustomerId(c.id);
+                  setCustomerSearch(c.name);
+                  setShowCustomerList(false);
+                }}
+              >
+                <Text style={styles.dropdownItem}>{c.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
-      <TouchableOpacity
-           style={styles.input}
-           onPress={() => setShowDatePicker(true)}
-       >
-         <Text>
-            {deliveryDate
-              ? new Date(deliveryDate).toLocaleString()
-              : "Select Delivery Date"}
+        {/* ADD NEW CUSTOMER BUTTON */}
+        <TouchableOpacity onPress={() => setShowNewCustomer(!showNewCustomer)}>
+          <Text style={{ color: "#2563eb", marginTop: 8 }}>
+            + Add New Customer
           </Text>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
-      {showDatePicker && (
-          <DateTimePicker
-            value={deliveryDate ? new Date(deliveryDate) : new Date()}
-            mode="datetime"
-            display="default"
-            onChange={(event, selectedDate) => {
-              setShowDatePicker(false);
-
-              if (event.type === "dismissed") return;
-
-              if (selectedDate) {
-                setDeliveryDate(selectedDate.toISOString());
-              }
-            }}
-          />
-      )}
-      {/* ITEMS */}
-
-      {items.map((item, index) => {
-
-        const product = products.find(p => p.id === item.productId);
-
-        const pricePerUnit = getProductPrice(product);
-
-        const total = pricePerUnit * (item.quantity || 0);
-
-        return (
-
-          <View key={index} style={styles.card}>
-
-            <Text style={styles.subtitle}>Item {index + 1}</Text>
-
-            <Picker
-              selectedValue={item.productId}
-              onValueChange={(v) => updateItem(index, "productId", v)}
-            >
-              <Picker.Item label="Select Product" value="" />
-
-              {products.map(p => (
-                <Picker.Item key={p.id} label={p.name} value={p.id} />
-              ))}
-
-            </Picker>
-
-            {product && (
-              <Text style={styles.price}>
-                Price per unit: ₹{pricePerUnit}
-              </Text>
-            )}
-
-            <Picker
-              selectedValue={item.workflowId}
-              onValueChange={(v) => updateItem(index, "workflowId", v)}
-            >
-              <Picker.Item label="Select Workflow" value="" />
-
-              {workflows.map(w => (
-                <Picker.Item key={w.id} label={w.name} value={w.id} />
-              ))}
-
-            </Picker>
-
+        {showNewCustomer && (
+          <>
             <TextInput
               style={styles.input}
-              keyboardType="numeric"
-              value={String(item.quantity)}
-              onChangeText={(v) => updateItem(index, "quantity", v)}
+              placeholder="New Customer Name"
+              value={newCustomerName}
+              onChangeText={setNewCustomerName}
             />
+            <TextInput
+              style={styles.input}
+              placeholder="Customer Phone"
+              value={newCustomerPhone}
+              onChangeText={setNewCustomerPhone}
+            />
+            <Text style={styles.label}>Customer Type</Text>
 
-            {product && (
-              <Text style={styles.total}>
-                Total Price: ₹{total}
+            <View style={styles.dropdown}>
+              {["retail", "wholesale"].map(type => (
+                <TouchableOpacity key={type} onPress={() => setCustomerType(type)}>
+                  <Text style={styles.dropdownItem}>
+                    {type.toUpperCase()} {customerType === type ? "✓" : ""}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+
+      <Text style={styles.label}>Delivery Date</Text>
+      <TouchableOpacity style={styles.input} onPress={() => setDateModal(true)}>
+        <Text>{deliveryDate ? new Date(deliveryDate).toLocaleDateString() : "Select Delivery Date"}</Text>
+      </TouchableOpacity>
+
+      <Modal isVisible={dateModal} onBackdropPress={() => setDateModal(false)} style={{ justifyContent: "flex-end", margin: 0 }}>
+        <View style={styles.modalBox}>
+          <Calendar onDayPress={(day) => { setDeliveryDate(new Date(day.dateString).toISOString()); setDateModal(false); }} />
+        </View>
+      </Modal>
+      <Text style={styles.label}>Delivery Method</Text>
+        <View style={styles.dropdown}>
+          {["bus", "courier", "direct"].map(m => (
+            <TouchableOpacity key={m} onPress={() => setDeliveryMethod(m)}>
+              <Text style={styles.dropdownItem}>
+                {m.toUpperCase()} {deliveryMethod === m ? "✓" : ""}
               </Text>
-            )}
+            </TouchableOpacity>
+          ))}
+        </View>
 
-          </View>
-        );
-      })}
-
-      <Text style={styles.grand}>
-        Grand Total: ₹{calculateGrandTotal()}
-      </Text>
-
-      <TouchableOpacity style={styles.btn} onPress={addItem}>
-        <Text style={styles.btnText}>Add Item</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.submit} onPress={submitOrder}>
-         {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.btnText}>Submit Order</Text>
-         )}
-      </TouchableOpacity>
-
-    </ScrollView>
+        <Text style={styles.label}>Order Get Method</Text>
+        <View style={styles.dropdown}>
+          {["direct", "whatsapp", "call", "email"].map(m => (
+            <TouchableOpacity key={m} onPress={() => setOrderGetMethod(m)}>
+              <Text style={styles.dropdownItem}>
+                {m.toUpperCase()} {orderGetMethod === m ? "✓" : ""}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </>
   );
+
+   return (
+    <FlatList
+      style={styles.container}
+      data={items}
+      keyExtractor={(_, index) => index.toString()}
+      ListHeaderComponent={headerComponent}
+      renderItem={({ item, index }) => (
+        <OrderItemCard
+          item={item}
+          index={index}
+          products={products}
+          workflows={workflows}
+          productMap={productMap}
+          materialVariants={materialVariants}
+          addMaterial={addMaterial}
+          updateMaterialQty={updateMaterialQty}
+          getProductPrice={getProductPrice}
+          onUpdate={updateItem}
+        />
+      )}
+      ListFooterComponent={
+        <>
+          <Text style={styles.grand}>Grand Total: ₹{grandTotal}</Text>
+          <TouchableOpacity style={styles.btn} onPress={addItem}>
+            <Text style={styles.btnText}>Add Item</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.submit} onPress={submitOrder}>
+            {loading ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Submit Order</Text>}
+          </TouchableOpacity>
+        </>
+      }
+      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+    />
+  );
+
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  title: { fontSize: 24, fontWeight: "bold" },
+  back: { color: "#2563eb", fontWeight: "600" },
+  label: { fontWeight: "600", marginTop: 10 },
+  input: { borderWidth: 1, borderColor: "#ccc", padding: 10, marginTop: 8, borderRadius: 6 },
+  card: { marginTop: 16, padding: 12, borderWidth: 1, borderColor: "#ddd", borderRadius: 8, backgroundColor: "white" },
+  subtitle: { fontWeight: "bold", marginBottom: 10 },
+  price: { marginTop: 5, color: "green" },
+  total: { marginTop: 5, fontWeight: "bold" },
+  grand: { fontSize: 20, fontWeight: "bold", marginTop: 20 },
+  btn: { backgroundColor: "#2563eb", padding: 12, marginTop: 20, borderRadius: 6 },
+  submit: { backgroundColor: "#16a34a", padding: 12, marginTop: 10, borderRadius: 6 },
+  btnText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
+  modalBox: { backgroundColor: "white", padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
 
-  container: {
-    flex: 1,
-    padding: 16,
-  },
+  searchItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee"
+     },
 
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20
-  },
-
-  label: {
-    fontWeight: "600",
-    marginTop: 10
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    marginTop: 8,
-    borderRadius: 6
-  },
-
-  card: {
-    marginTop: 20,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8
-  },
-
-  subtitle: {
-    fontWeight: "bold",
-    marginBottom: 10
-  },
-
-  price: {
-    marginTop: 5,
-    color: "green"
-  },
-
-  total: {
-    marginTop: 5,
-    fontWeight: "bold"
-  },
-
-  grand: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginTop: 20
-  },
-
-  btn: {
-    backgroundColor: "#2563eb",
-    padding: 12,
-    marginTop: 20,
-    borderRadius: 6
-  },
-
-  submit: {
-    backgroundColor: "#16a34a",
-    padding: 12,
-    marginTop: 10,
-    borderRadius: 6
-  },
-
-  btnText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "bold"
-  }
-
+  dropdown: {
+      backgroundColor: "#fff",
+      borderWidth: 1,
+      borderColor: "#ccc",
+      maxHeight: 150,
+      zIndex: 1000,
+      elevation: 5,
+    }
 });
